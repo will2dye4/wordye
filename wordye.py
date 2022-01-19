@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 import argparse
@@ -41,7 +42,7 @@ class Word:
     letters: list[Letter] = field(default_factory=list)
 
 
-class Game:
+class Game(ABC):
 
     def __init__(self, hard_mode: bool = False) -> None:
         self.hard_mode = hard_mode
@@ -84,6 +85,10 @@ class Game:
                         (letter.state == LetterState.IN_WORD and letter.text not in guess)):
                     raise HardModeRuleViolation()
 
+        for letter, state in self._letters.items():
+            if state != LetterState.NOT_IN_WORD:
+                self._letters[letter] = LetterState.UNKNOWN
+
         word = Word()
         seen_letters = set()
         for guess_letter, correct_letter in zip(guess, self._solution):
@@ -96,7 +101,7 @@ class Game:
                     state = LetterState.IN_WORD
             word.letters.append(Letter(guess_letter, state))
             seen_letters.add(guess_letter)
-            self._letters[guess_letter] = state  # TODO - need to reset non-ruled-out letters to unknown first?
+            self._letters[guess_letter] = state
         self.attempts.append(word)
 
     @staticmethod
@@ -121,18 +126,13 @@ class Game:
             ]
             print(f'\n{"".join(guess)}')
 
-    def make_guess(self) -> None:
-        letters = ''.join(
-            self.format_letter_text(letter, state)
-            for letter, state in self._letters.items()
-            if state != LetterState.NOT_IN_WORD
-        )
-        while True:
-            try:
-                guess = input(f'[{len(self.attempts) + 1}/{MAX_ATTEMPTS}] Enter guess ({letters}): ')
-            except EOFError:
-                raise KeyboardInterrupt()
+    @abstractmethod
+    def get_guess(self) -> str:
+        raise NotImplementedError()
 
+    def make_guess(self) -> None:
+        while True:
+            guess = self.get_guess()
             try:
                 self.guess_word(guess)
             except HardModeRuleViolation:
@@ -146,7 +146,7 @@ class Game:
 
     def play(self) -> None:
         try:
-            print('  _  ' * WORD_LENGTH)
+            print('\n' + ('  _  ' * WORD_LENGTH))
             while not self.game_over:
                 self.make_guess()
                 self.print_last_guess()
@@ -161,6 +161,20 @@ class Game:
             print('\nGoodbye!')
 
 
+class CLIGame(Game):
+
+    def get_guess(self) -> str:
+        letters = ''.join(
+            self.format_letter_text(letter, state)
+            for letter, state in self._letters.items()
+            if state != LetterState.NOT_IN_WORD
+        )
+        try:
+            return input(f'[{len(self.attempts) + 1}/{MAX_ATTEMPTS}] Enter guess ({letters}): ')
+        except EOFError:
+            raise KeyboardInterrupt()
+
+
 def get_word_list(filename) -> list[str]:
     with open(filename) as f:
         return [line.strip().upper() for line in f if line.strip()]
@@ -170,7 +184,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='play a game of Wordye')
     parser.add_argument('-!', '--hard-mode', action='store_true', help='play in hard mode')
     args = parser.parse_args()
-    Game(hard_mode=args.hard_mode).play()
+    CLIGame(hard_mode=args.hard_mode).play()
 
 
 if __name__ == '__main__':
