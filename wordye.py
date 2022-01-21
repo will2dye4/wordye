@@ -11,6 +11,10 @@ import string
 MAX_ATTEMPTS = 6
 WORD_LENGTH = 5
 
+BLACK_SQUARE_EMOJI = '\u2B1B'
+GREEN_SQUARE_EMOJI = '\U0001f7e9'
+YELLOW_SQUARE_EMOJI = '\U0001f7e8'
+
 
 class HardModeRuleViolation(Exception):
     pass
@@ -126,6 +130,28 @@ class Game(ABC):
             ]
             print(f'\n{"".join(guess)}')
 
+    def print_game_emoji(self) -> None:
+        if not self.game_over:
+            return
+        if ''.join(letter.text for letter in self.attempts[-1].letters) == self._solution:
+            score = len(self.attempts)
+        else:
+            score = 'X'
+        heading = f'Wordye {self._solution} {score}/{MAX_ATTEMPTS}'
+        if self.hard_mode:
+            heading += '*'
+        print(f'\n{heading}')
+        for attempt in self.attempts:
+            word_emoji = ''
+            for letter in attempt.letters:
+                if letter.state == LetterState.IN_CORRECT_POSITION:
+                    word_emoji += GREEN_SQUARE_EMOJI
+                elif letter.state == LetterState.IN_WORD:
+                    word_emoji += YELLOW_SQUARE_EMOJI
+                else:
+                    word_emoji += BLACK_SQUARE_EMOJI
+            print(word_emoji)
+
     @abstractmethod
     def get_guess(self) -> str:
         raise NotImplementedError()
@@ -157,6 +183,7 @@ class Game(ABC):
             else:
                 print('Better luck next time!')
                 print(f'The correct solution was: {self._solution}')
+            self.print_game_emoji()
         except KeyboardInterrupt:
             print('\nGoodbye!')
 
