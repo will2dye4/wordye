@@ -185,7 +185,10 @@ class Game(ABC):
                 print(f'The correct solution was: {self._solution}')
             self.print_game_emoji()
         except KeyboardInterrupt:
-            print('\nGoodbye!')
+            if self.game_over:
+                print('\nGoodbye!')
+            else:
+                print(f'\nYou lost! The correct answer was: {self._solution}')
 
 
 class CLIGame(Game):
