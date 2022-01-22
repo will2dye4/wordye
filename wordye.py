@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 import argparse
@@ -55,6 +56,9 @@ class Game(ABC):
         valid_solutions = get_word_list('valid_solutions.txt')
         self._solution = random.choice(valid_solutions)
         self._valid_guesses = set(valid_solutions + get_word_list('valid_guesses.txt'))
+        self._correct_letter_indices = defaultdict(list)
+        for index, letter in enumerate(self._solution):
+            self._correct_letter_indices[letter].append(index)
 
     @property
     def attempts(self) -> list[Word]:
@@ -85,26 +89,35 @@ class Game(ABC):
         if self.hard_mode and self.attempts:
             prev_attempt = self.attempts[-1]
             for index, letter in enumerate(prev_attempt.letters):
-                if ((letter.state == LetterState.IN_CORRECT_POSITION and guess[index] != letter.text) or
-                        (letter.state == LetterState.IN_WORD and letter.text not in guess)):
+                if letter.state == LetterState.IN_CORRECT_POSITION and guess[index] != letter.text:
+                    #  or (letter.state == LetterState.IN_WORD and letter.text not in guess)):
                     raise HardModeRuleViolation()
 
         for letter, state in self._letters.items():
             if state != LetterState.NOT_IN_WORD:
                 self._letters[letter] = LetterState.UNKNOWN
 
+        guess_letter_indices = defaultdict(list)
+        for index, letter in enumerate(guess):
+            guess_letter_indices[letter].append(index)
+
         word = Word()
-        seen_letters = set()
-        for guess_letter, correct_letter in zip(guess, self._solution):
+        for index, (guess_letter, correct_letter) in enumerate(zip(guess, self._solution)):
             state = LetterState.NOT_IN_WORD
             if guess_letter == correct_letter:
                 state = LetterState.IN_CORRECT_POSITION
-            elif guess_letter in self._solution and guess_letter not in seen_letters:
-                correct_index = self._solution.index(guess_letter)
-                if guess[correct_index] != guess_letter:  # prevent marking the same letter as yellow and green
+            elif guess_letter in self._solution:
+                correct_indices = self._correct_letter_indices[guess_letter]
+                correctly_guessed_indices = []
+                incorrectly_guessed_indices = []
+                for i in guess_letter_indices[guess_letter]:
+                    if i in correct_indices:
+                        correctly_guessed_indices.append(i)
+                    else:
+                        incorrectly_guessed_indices.append(i)
+                if incorrectly_guessed_indices.index(index) + len(correctly_guessed_indices) < len(correct_indices):
                     state = LetterState.IN_WORD
             word.letters.append(Letter(guess_letter, state))
-            seen_letters.add(guess_letter)
             self._letters[guess_letter] = state
         self.attempts.append(word)
 
@@ -170,7 +183,7 @@ class Game(ABC):
             else:
                 return
 
-    def play(self) -> None:
+    def play(self) -> bool:
         try:
             print('\n' + ('  _  ' * WORD_LENGTH))
             while not self.game_over:
@@ -189,6 +202,7 @@ class Game(ABC):
                 print('\nGoodbye!')
             else:
                 print(f'\nYou lost! The correct answer was: {self._solution}')
+        return self.won
 
 
 class CLIGame(Game):

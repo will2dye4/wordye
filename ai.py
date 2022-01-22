@@ -46,6 +46,7 @@ class AIGame(Game):
         else:
             guess = STARTING_GUESS
         print(f'[{len(self.attempts) + 1}/{MAX_ATTEMPTS}] Guessing: {guess}')
+        self._candidates.remove(guess)
         return guess
 
 
